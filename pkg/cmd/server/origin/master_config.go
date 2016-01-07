@@ -167,7 +167,8 @@ func BuildMasterConfig(options configapi.MasterConfig) (*MasterConfig, error) {
 	kubeletClientConfig := configapi.GetKubeletClientConfig(options)
 
 	// in-order list of plug-ins that should intercept admission decisions (origin only intercepts)
-	admissionControlPluginNames := []string{"OriginNamespaceLifecycle", "BuildByStrategy"}
+	// TODO: Drop default of blocking diabled volume types here:
+	admissionControlPluginNames := []string{"OriginNamespaceLifecycle", "BuildByStrategy", "BlockDisabledVolumeTypes"}
 	if len(options.AdmissionConfig.PluginOrderOverride) > 0 {
 		admissionControlPluginNames = options.AdmissionConfig.PluginOrderOverride
 	}
