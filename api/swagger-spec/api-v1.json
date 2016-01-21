@@ -14747,6 +14747,7 @@
      "requiredDropCapabilities",
      "allowedCapabilities",
      "allowHostDirVolumePlugin",
+     "allowEmptyDirVolumePlugin",
      "allowHostNetwork",
      "allowHostPorts",
      "allowHostPID",
@@ -14797,6 +14798,10 @@
      "allowHostDirVolumePlugin": {
       "type": "boolean",
       "description": "allow the use of the host dir volume plugin"
+     },
+     "allowEmptyDirVolumePlugin": {
+      "type": "boolean",
+      "description": "allow the use of the empty dir volume plugin"
      },
      "allowHostNetwork": {
       "type": "boolean",
