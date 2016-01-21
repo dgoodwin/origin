@@ -243,10 +243,17 @@ func (s *simpleProvider) ValidateContainerSecurityContext(pod *api.Pod, containe
 
 	allErrs = append(allErrs, s.capabilitiesStrategy.Validate(pod, container)...)
 
-	if !s.scc.AllowHostDirVolumePlugin {
-		for _, v := range pod.Spec.Volumes {
-			if v.HostPath != nil {
-				allErrs = append(allErrs, fielderrors.NewFieldInvalid("VolumeMounts", v.Name, "Host Volumes are not allowed to be used"))
+	if !s.scc.AllowHostDirVolumePlugin || !s.scc.AllowEmptyDirVolumePlugin {
+		for idx, v := range pod.Spec.Volumes {
+			if !s.scc.AllowHostDirVolumePlugin && v.HostPath != nil {
+				allErrs = append(allErrs, fielderrors.NewFieldInvalid(
+					fmt.Sprintf("volumes[%d]", idx), "hostPath",
+					"HostPath volumes are not allowed to be used"))
+			}
+			if !s.scc.AllowEmptyDirVolumePlugin && v.EmptyDir != nil {
+				allErrs = append(allErrs, fielderrors.NewFieldInvalid(
+					fmt.Sprintf("volumes[%d]", idx), "emptyDir",
+					"EmptyDir volumes are not allowed to be used"))
 			}
 		}
 	}
