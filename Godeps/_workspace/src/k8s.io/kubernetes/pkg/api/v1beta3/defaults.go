@@ -19,9 +19,9 @@ package v1beta3
 import (
 	"strings"
 
+	"github.com/golang/glog"
 	"k8s.io/kubernetes/pkg/api"
 	"k8s.io/kubernetes/pkg/util"
-	"github.com/golang/glog"
 )
 
 func addDefaultingFuncs() {
@@ -228,5 +228,11 @@ func defaultSecurityContextConstraints(scc *SecurityContextConstraints) {
 	}
 	if len(scc.SupplementalGroups.Type) == 0 {
 		scc.SupplementalGroups.Type = SupplementalGroupsStrategyRunAsAny
+	}
+
+	// EmptyDir volumes were implicitly allowed originally, always default this to true.
+	if scc.AllowEmptyDirVolumePlugin == nil {
+		scc.AllowEmptyDirVolumePlugin = new(bool)
+		*scc.AllowEmptyDirVolumePlugin = true
 	}
 }
