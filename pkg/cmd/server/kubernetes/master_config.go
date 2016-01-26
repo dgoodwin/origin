@@ -35,8 +35,7 @@ import (
 )
 
 // AdmissionPlugins is the full list of admission control plugins to enable in the order they must run
-// TODO: Drop BlockDisabledVolumeTypes here
-var AdmissionPlugins = []string{"NamespaceLifecycle", "OriginPodNodeEnvironment", "LimitRanger", "ServiceAccount", "SecurityContextConstraint", "ResourceQuota", "SCCExecRestrictions", "BlockDisabledVolumeTypes"}
+var AdmissionPlugins = []string{"NamespaceLifecycle", "OriginPodNodeEnvironment", "LimitRanger", "ServiceAccount", "SecurityContextConstraint", "ResourceQuota", "SCCExecRestrictions"}
 
 // MasterConfig defines the required values to start a Kubernetes master
 type MasterConfig struct {

@@ -20,7 +20,7 @@ import (
 )
 
 func NewTestAdmission(store cache.Store, kclient client.Interface) kadmission.Interface {
-	return &constraint{
+	return &Constraint{
 		Handler: kadmission.NewHandler(kadmission.Create),
 		client:  kclient,
 		store:   store,
@@ -813,7 +813,7 @@ func TestCreateProvidersFromConstraints(t *testing.T) {
 
 		// create the admission handler
 		tc := testclient.NewSimpleFake(v.namespace)
-		admit := &constraint{
+		admit := &Constraint{
 			Handler: kadmission.NewHandler(kadmission.Create),
 			client:  tc,
 			store:   store,

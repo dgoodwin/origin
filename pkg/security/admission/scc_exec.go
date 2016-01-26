@@ -35,7 +35,7 @@ func init() {
 // a pod that the user would not be allowed to create
 type sccExecRestrictions struct {
 	*admission.Handler
-	constraintAdmission *constraint
+	constraintAdmission *Constraint
 	client              client.Interface
 }
 
@@ -70,7 +70,7 @@ func (d *sccExecRestrictions) Admit(a admission.Attributes) (err error) {
 func NewSCCExecRestrictions(client client.Interface) *sccExecRestrictions {
 	return &sccExecRestrictions{
 		Handler:             admission.NewHandler(admission.Connect),
-		constraintAdmission: NewConstraint(client),
+		constraintAdmission: NewConstraint(client, true),
 		client:              client,
 	}
 }

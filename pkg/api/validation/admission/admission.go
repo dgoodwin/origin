@@ -7,10 +7,11 @@ import (
 	"k8s.io/kubernetes/pkg/admission"
 	kapi "k8s.io/kubernetes/pkg/api"
 	extapi "k8s.io/kubernetes/pkg/apis/extensions"
-	kclient "k8s.io/kubernetes/pkg/client/unversioned"
+	client "k8s.io/kubernetes/pkg/client/unversioned"
 	runtime "k8s.io/kubernetes/pkg/runtime"
 
 	deployapi "github.com/openshift/origin/pkg/deploy/api"
+	sccadmission "github.com/openshift/origin/pkg/security/admission"
 	templateapi "github.com/openshift/origin/pkg/template/api"
 	"log"
 	"reflect"
@@ -21,8 +22,8 @@ const (
 )
 
 func init() {
-	admission.RegisterPlugin("BlockDisabledVolumeTypes", func(c kclient.Interface, config io.Reader) (admission.Interface, error) {
-		return NewBlockDisabledVolumeTypes(), nil
+	admission.RegisterPlugin("BlockDisabledVolumeTypes", func(c client.Interface, config io.Reader) (admission.Interface, error) {
+		return NewBlockDisabledVolumeTypes(c), nil
 	})
 }
 
@@ -32,7 +33,8 @@ type blockVolumeTypes struct {
 
 // NewBlockDisabledVolumeTypes returns an admission control to block certain volume types
 // as (optionally) defined in master config.
-func NewBlockDisabledVolumeTypes() admission.Interface {
+func NewBlockDisabledVolumeTypes(client client.Interface) admission.Interface {
+	return sccadmission.NewConstraint(client, true)
 	return &blockVolumeTypes{
 		Handler: admission.NewHandler(admission.Create, admission.Update),
 	}

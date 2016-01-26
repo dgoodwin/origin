@@ -3,6 +3,8 @@ package admission
 import (
 	"fmt"
 	"io"
+	"log"
+	"reflect"
 	"sort"
 	"strings"
 
@@ -20,8 +22,11 @@ import (
 	"k8s.io/kubernetes/pkg/util/sets"
 	"k8s.io/kubernetes/pkg/watch"
 
+	deployapi "github.com/openshift/origin/pkg/deploy/api"
 	allocator "github.com/openshift/origin/pkg/security"
 	"github.com/openshift/origin/pkg/security/uid"
+	templateapi "github.com/openshift/origin/pkg/template/api"
+	extapi "k8s.io/kubernetes/pkg/apis/extensions"
 	"k8s.io/kubernetes/pkg/auth/user"
 	"k8s.io/kubernetes/pkg/util/fielderrors"
 
@@ -30,25 +35,33 @@ import (
 
 func init() {
 	kadmission.RegisterPlugin("SecurityContextConstraint", func(client client.Interface, config io.Reader) (kadmission.Interface, error) {
-		constraintAdmitter := NewConstraint(client)
+		constraintAdmitter := NewConstraint(client, true)
 		constraintAdmitter.Run()
 		return constraintAdmitter, nil
 	})
 }
 
-type constraint struct {
+type ConstraintOptions struct {
+	// By default this admission controller scans only incoming Pod objects.
+	// If set to true, we will scan any object known to potentially contain a PodSpec
+	// and check it against the SCC. (deployment configs, replication controllers, etc)
+	scanAllPodSpecs bool
+}
+
+type Constraint struct {
 	*kadmission.Handler
 	client client.Interface
 
 	reflector *cache.Reflector
 	stopChan  chan struct{}
 	store     cache.Store
+	options   ConstraintOptions
 }
 
-var _ kadmission.Interface = &constraint{}
+var _ kadmission.Interface = &Constraint{}
 
 // NewConstraint creates a new SCC constraint admission plugin.
-func NewConstraint(kclient client.Interface) *constraint {
+func NewConstraint(kclient client.Interface, scanAllPodSpecs bool) *Constraint {
 	store := cache.NewStore(cache.MetaNamespaceKeyFunc)
 	reflector := cache.NewReflector(
 		&cache.ListWatch{
@@ -64,22 +77,26 @@ func NewConstraint(kclient client.Interface) *constraint {
 		0,
 	)
 
-	return &constraint{
-		Handler: kadmission.NewHandler(kadmission.Create),
+	opts := ConstraintOptions{scanAllPodSpecs: scanAllPodSpecs}
+
+	return &Constraint{
+		// TODO: Is this safe to expand to Update? Why did we enforce SCC only on pod create previously?
+		Handler: kadmission.NewHandler(kadmission.Create, kadmission.Update),
 		client:  kclient,
 
 		store:     store,
 		reflector: reflector,
+		options:   opts,
 	}
 }
 
-func (a *constraint) Run() {
+func (a *Constraint) Run() {
 	if a.stopChan == nil {
 		a.stopChan = make(chan struct{})
 		a.reflector.RunUntil(a.stopChan)
 	}
 }
-func (a *constraint) Stop() {
+func (a *Constraint) Stop() {
 	if a.stopChan != nil {
 		close(a.stopChan)
 		a.stopChan = nil
@@ -96,16 +113,43 @@ func (a *constraint) Stop() {
 // 5.  Try to generate and validate an SCC with providers.  If we find one then admit the pod
 //     with the validated SCC.  If we don't find any reject the pod and give all errors from the
 //     failed attempts.
-func (c *constraint) Admit(a kadmission.Attributes) error {
-	if a.GetResource() != string(kapi.ResourcePods) {
+func (c *Constraint) Admit(a kadmission.Attributes) error {
+
+	//TODO: temporary
+	if a.GetSubresource() == "status" {
 		return nil
 	}
 
-	pod, ok := a.GetObject().(*kapi.Pod)
-	// if we can't convert then we don't handle this object so just return
+	log.Printf("######################### Running admission controller.\n")
+	log.Println("  resource = ", a.GetResource())
+	log.Println("  sub-resource = ", a.GetSubresource())
+	log.Println("  operation = ", a.GetOperation())
+	log.Println("  kind = ", a.GetKind())
+	//log.Println("  object = ", attrs.GetObject())
+	log.Println("  object type = ", reflect.TypeOf(a.GetObject()).String())
+	log.Println("  user name = ", a.GetUserInfo().GetName())
+	log.Println("  user uid = ", a.GetUserInfo().GetUID())
+	log.Println("  user groups = ", a.GetUserInfo().GetGroups())
+
+	// Check if this is a Pod, if not and the appropriate option is enabled, check if it's an object that
+	// might contain a PodSpec.
+	var pod *kapi.Pod
+	var ok bool
+	pod, ok = a.GetObject().(*kapi.Pod)
 	if !ok {
+		if c.options.scanAllPodSpecs {
+			log.Println("Scanning all podSpecs")
+			pod = extractEmbeddedPod(a.GetObject())
+			if pod == nil {
+				return nil
+			}
+		}
+	}
+	if pod == nil {
 		return nil
 	}
+
+	log.Printf("Checking pod: %s\n", *pod)
 
 	// get all constraints that are usable by the user
 	glog.V(4).Infof("getting security context constraints for pod %s (generate: %s) in namespace %s with user info %v", pod.Name, pod.GenerateName, a.GetNamespace(), a.GetUserInfo())
@@ -132,7 +176,7 @@ func (c *constraint) Admit(a kadmission.Attributes) error {
 	logProviders(pod, providers, errs)
 
 	if len(providers) == 0 {
-		return kadmission.NewForbidden(a, fmt.Errorf("no providers available to validated pod request"))
+		return kadmission.NewForbidden(a, fmt.Errorf("no providers available to validate pod request"))
 	}
 
 	// all containers in a single pod must validate under a single provider or we will reject the request
@@ -149,12 +193,57 @@ func (c *constraint) Admit(a kadmission.Attributes) error {
 			pod.ObjectMeta.Annotations = map[string]string{}
 		}
 		pod.ObjectMeta.Annotations[allocator.ValidatedSCCAnnotation] = provider.GetSCCName()
+		log.Println("All done, everything ok")
 		return nil
 	}
 
 	// we didn't validate against any security context constraint provider, reject the pod and give the errors for each attempt
 	glog.V(4).Infof("unable to validate pod %s (generate: %s) against any security context constraint: %v", pod.Name, pod.GenerateName, validationErrs)
 	return kadmission.NewForbidden(a, fmt.Errorf("unable to validate against any security context constraint: %v", validationErrs))
+}
+
+func createDummyPod(spec kapi.PodSpec) *kapi.Pod {
+	pod := kapi.Pod{Spec: spec}
+	return &pod
+}
+
+// Checks if the given object is of a type we know could contain a PodSpec,
+// extracts it if so, and wraps it in a dummy Pod object. Will return nil
+// if the object cannot or does not contain a PodSpec.
+func extractEmbeddedPod(obj runtime.Object) *kapi.Pod {
+	switch obj.(type) {
+	case *templateapi.Template:
+		log.Println("YAY we got a template!!!")
+		t := obj.(*templateapi.Template)
+		log.Printf("%s\n", t)
+
+		// Recurse through the objects in the template:
+
+		runtime.DecodeList(t.Objects, kapi.Scheme)
+		// TODO: Template could contain multiple PodSpecs, check them all.
+		for _, item := range t.Objects {
+			return extractEmbeddedPod(item)
+		}
+	case *deployapi.DeploymentConfig:
+		log.Println("Detected create/update of a DeploymentConfig.")
+		dc := obj.(*deployapi.DeploymentConfig)
+		if &dc.Spec != nil && &dc.Spec.Template != nil && &dc.Spec.Template.Spec != nil {
+			return createDummyPod(dc.Spec.Template.Spec)
+		}
+	case *kapi.ReplicationController:
+		log.Println("Detected create/update of a ReplicationController.")
+		rc := obj.(*kapi.ReplicationController)
+		if &rc.Spec != nil && &rc.Spec.Template != nil && &rc.Spec.Template.Spec != nil {
+			return createDummyPod(rc.Spec.Template.Spec)
+		}
+	case *extapi.Job:
+		log.Println("Detected create/update of a Job.")
+		j := obj.(*extapi.Job)
+		if &j.Spec != nil && &j.Spec.Template != nil && &j.Spec.Template.Spec != nil {
+			return createDummyPod(j.Spec.Template.Spec)
+		}
+	}
+	return nil
 }
 
 // assignSecurityContext creates a security context for each container in the pod
@@ -213,7 +302,7 @@ func assignSecurityContext(provider scc.SecurityContextConstraintsProvider, pod 
 
 // createProvidersFromConstraints creates providers from the constraints supplied, including
 // looking up pre-allocated values if necessary using the pod's namespace.
-func (c *constraint) createProvidersFromConstraints(ns string, sccs []*kapi.SecurityContextConstraints) ([]scc.SecurityContextConstraintsProvider, []error) {
+func (c *Constraint) createProvidersFromConstraints(ns string, sccs []*kapi.SecurityContextConstraints) ([]scc.SecurityContextConstraintsProvider, []error) {
 	var (
 		// namespace is declared here for reuse but we will not fetch it unless required by the matched constraints
 		namespace *kapi.Namespace
@@ -299,7 +388,7 @@ func (c *constraint) createProvidersFromConstraints(ns string, sccs []*kapi.Secu
 }
 
 // getNamespace retrieves a namespace only if ns is nil.
-func (c *constraint) getNamespace(name string, ns *kapi.Namespace) (*kapi.Namespace, error) {
+func (c *Constraint) getNamespace(name string, ns *kapi.Namespace) (*kapi.Namespace, error) {
 	if ns != nil && name == ns.Name {
 		return ns, nil
 	}
