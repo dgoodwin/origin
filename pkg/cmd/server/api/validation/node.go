@@ -50,6 +50,8 @@ func ValidateNodeConfig(config *api.NodeConfig, fldPath *field.Path) ValidationR
 		validationResults.AddErrors(field.Invalid(fldPath.Child("iptablesSyncPeriod"), config.IPTablesSyncPeriod, fmt.Sprintf("unable to parse iptablesSyncPeriod: %v. Examples with correct format: '5s', '1m', '2h22m'", err)))
 	}
 
+	validationResults.AddErrors(ValidateVolumeConfig(config.VolumeConfig, fldPath.Child("volumeConfig"))...)
+
 	return validationResults
 }
 
@@ -112,4 +114,15 @@ func ValidateDockerConfig(config api.DockerConfig, fldPath *field.Path) field.Er
 
 func ValidateKubeletExtendedArguments(config api.ExtendedArguments, fldPath *field.Path) field.ErrorList {
 	return ValidateExtendedArguments(config, kubeletoptions.NewKubeletServer().AddFlags, fldPath)
+}
+
+func ValidateVolumeConfig(config api.VolumeConfig, fldPath *field.Path) field.ErrorList {
+	allErrs := field.ErrorList{}
+
+	fsGroupLocalQuotaPath := fldPath.Child("localQuota").Child("fsGroup")
+	if config.LocalQuota.FSGroup != nil && config.LocalQuota.FSGroup.Value() < 0 {
+		allErrs = append(allErrs, field.Invalid(fsGroupLocalQuotaPath,
+			config.LocalQuota.FSGroup, "must be a positive integer"))
+	}
+	return allErrs
 }
