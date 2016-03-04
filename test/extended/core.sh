@@ -72,6 +72,9 @@ if [[ -z ${TEST_ONLY+x} ]]; then
 
   echo "[INFO] Creating image streams"
   oc create -n openshift -f examples/image-streams/image-streams-centos7.json --config="${ADMIN_KUBECONFIG}"
+
+  echo "[INFO] Node config"
+  cat $NODE_CONFIG_DIR/node-config.yaml
 else
   # be sure to set VOLUME_DIR if you are running with TEST_ONLY
   echo "[INFO] Not starting server, VOLUME_DIR=${VOLUME_DIR:-}"

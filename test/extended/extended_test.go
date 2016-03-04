@@ -11,6 +11,7 @@ import (
 	_ "github.com/openshift/origin/test/extended/jobs"
 	_ "github.com/openshift/origin/test/extended/router"
 	_ "github.com/openshift/origin/test/extended/security"
+	_ "github.com/openshift/origin/test/extended/volumes"
 
 	exutil "github.com/openshift/origin/test/extended/util"
 )
