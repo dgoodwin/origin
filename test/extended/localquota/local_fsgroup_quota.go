@@ -1,4 +1,4 @@
-package builds
+package localquota
 
 import (
 	"fmt"
@@ -77,7 +77,7 @@ var _ = g.Describe("[volumes] Test local storage quota", func() {
 
 			volDir := getEnvVar(volumeDirVar)
 			o.Expect(volDir).NotTo(o.Equal(""))
-			// TODO: Verify volDir is on XFS? Or just let the test fail.
+			// TODO: Verify volDir is on XFS?
 			// Use pre-existing utility in the empty_dir quota.go.
 
 			// Lookup the fsgroup for the pod's project. (first group ID in the supplemental range)
