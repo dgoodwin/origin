@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# This scripts starts the OpenShift server with a default configuration.
-# The OpenShift Docker registry and router are installed.
-# It will run all tests that are imported into test/extended.
+# This script runs the local quota tests which require volume dir
+# to be on an XFS filesystem. This test will fail if /tmp/openshift
+# is not on XFS.
 
 set -o errexit
 set -o nounset
@@ -47,7 +47,7 @@ if [[ -z ${TEST_ONLY+x} ]]; then
   trap "cleanup" EXIT
   echo "[INFO] Starting server"
 
-  os::util::environment::setup_all_server_vars "test-extended/core"
+  os::util::environment::setup_all_server_vars "test-extended/localquota"
   os::util::environment::use_sudo
   reset_tmp_dir
 
@@ -75,12 +75,12 @@ fi
 
 # ensure proper relative directories are set
 export TMPDIR=${BASETMPDIR:-/tmp}
-export EXTENDED_TEST_PATH="$(pwd)/test/extended"
 
 
 # run tests in serial
-echo "[INFO] Running serial tests"
-echo ${ginkgo}
-echo "ALL DONE?"
-${ginkgo} -v  ${localquotatest} -- -ginkgo.v -test.timeout 2m
+echo "[INFO] Running tests"
+
+# TODO: Need a better way to omit all the k8s e2e tests that get picked up automatically:
+${ginkgo} -v  ${localquotatest} -- -ginkgo.v -test.timeout 2m -focus="local storage quota"
+#TEST_OUTPUT_QUIET=true ${localquotatest} --ginkgo.dryRun | sort
 
