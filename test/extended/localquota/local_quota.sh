@@ -67,6 +67,7 @@ if [[ -z ${TEST_ONLY+x} ]]; then
   export KUBECONFIG="${ADMIN_KUBECONFIG}"
 
   echo "[INFO] Node config"
+  sed -i 's/fsGroup: null/fsGroup: 256Mi/' $NODE_CONFIG_DIR/node-config.yaml
   cat $NODE_CONFIG_DIR/node-config.yaml
 else
   # be sure to set VOLUME_DIR if you are running with TEST_ONLY
