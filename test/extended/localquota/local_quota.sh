@@ -52,6 +52,15 @@ if [[ -z ${TEST_ONLY+x} ]]; then
   reset_tmp_dir
 
   os::log::start_system_logger
+
+  # Use a special mount point for the volume directory in this test. This test
+  # suite requires that volume directory be on an XFS filesystem, and mounted
+  # with gquota option. The test images will ensure this is the case.
+  #
+  # To run this test locally and have it pass, you will need to create an XFS
+  # filesystem device and mount it to /tmp/openshift/xfs-vol-dir with the
+  # gquota option.
+  export VOLUME_DIR="/tmp/openshift/xfs-vol-dir"
   echo "[INFO] VOLUME_DIR=${VOLUME_DIR:-}"
 
   # when selinux is enforcing, the volume dir selinux label needs to be
@@ -64,8 +73,10 @@ if [[ -z ${TEST_ONLY+x} ]]; then
   fi
   configure_os_server
 
-  echo "[INFO] Node config"
+  # Enable a 256Mi local storage quota for emptyDir volumes:
   sed -i 's/fsGroup: null/fsGroup: 256Mi/' $NODE_CONFIG_DIR/node-config.yaml
+
+  echo "[INFO] Node config"
   cat $NODE_CONFIG_DIR/node-config.yaml
 
   start_os_server
