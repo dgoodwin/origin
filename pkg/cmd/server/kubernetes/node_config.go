@@ -212,7 +212,7 @@ func BuildKubernetesNodeConfig(options configapi.NodeConfig) (*NodeConfig, error
 			return nil, errors.New("unable to wrap emptyDir volume plugin for quota support")
 		}
 	} else {
-		glog.V(2).Info("Skipping replacement of empty-dir volume plugin with quota wrapper, no projectEmptyDirQuota specified")
+		glog.V(2).Info("Skipping replacement of empty-dir volume plugin with quota wrapper, no local fsGroup quota specified")
 	}
 
 	// provide any config overrides

@@ -63,13 +63,15 @@ if [[ -z ${TEST_ONLY+x} ]]; then
          sudo chcon -t svirt_sandbox_file_t ${VOLUME_DIR}
   fi
   configure_os_server
-  start_os_server
-
-  export KUBECONFIG="${ADMIN_KUBECONFIG}"
 
   echo "[INFO] Node config"
   sed -i 's/fsGroup: null/fsGroup: 256Mi/' $NODE_CONFIG_DIR/node-config.yaml
   cat $NODE_CONFIG_DIR/node-config.yaml
+
+  start_os_server
+
+  export KUBECONFIG="${ADMIN_KUBECONFIG}"
+
 else
   # be sure to set VOLUME_DIR if you are running with TEST_ONLY
   echo "[INFO] Not starting server, VOLUME_DIR=${VOLUME_DIR:-}"
