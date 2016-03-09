@@ -2,12 +2,14 @@ package localquota
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
 	"strings"
+	"time"
 
 	g "github.com/onsi/ginkgo"
 	o "github.com/onsi/gomega"
@@ -32,7 +34,7 @@ func getEnvVar(key string) string {
 func setFSGroupMustRunAs(oc *exutil.CLI) error {
 	// Write out to temp file so we can edit the SCC and update it:
 	tempFile, err := ioutil.TempFile("", "fsgroup-scc-edit")
-	//defer os.Remove(tempFile.Name())
+	defer os.Remove(tempFile.Name())
 	fmt.Printf("Created temp file: %s\n", tempFile.Name())
 
 	outBytes, err := oc.AsAdmin().Run("export").Args("scc/restricted").Output()
@@ -97,7 +99,9 @@ func lookupXFSQuota(oc *exutil.CLI, fsGroup int, volDir string) (int, error) {
 	}
 	fmt.Printf("Volume directory is on: %s\n", fsDevice)
 
-	args := []string{"xfs_quota", "-x", "-c", "report -n", fsDevice}
+	args := []string{"xfs_quota", "-x", "-c",
+		fmt.Sprintf("report -n -L %d -U %d", fsGroup, fsGroup),
+		fsDevice}
 	fmt.Printf("%s\n", args)
 	cmd := exec.Command("sudo", args...)
 	var stderr bytes.Buffer
@@ -109,7 +113,32 @@ func lookupXFSQuota(oc *exutil.CLI, fsGroup int, volDir string) (int, error) {
 	fmt.Printf("stderr: %s\n", stderr.String())
 	quotaReport := string(outBytes)
 	fmt.Printf("Got XFS Quota report: \n%s\n", quotaReport)
-	return 0, nil
+
+	// Parse output looking for lines starting with a #, which are the lines with
+	// group IDs and their quotas:
+	lines := strings.Split(quotaReport, "\n")
+	var quotaFound int
+	for _, l := range lines {
+		fmt.Printf("Got line: %s\n", l)
+		if strings.HasPrefix(l, fmt.Sprintf("#%d", fsGroup)) {
+			fmt.Println("Found!")
+			words := strings.Fields(l)
+			fmt.Printf("Words: %s\n", words)
+			if len(words) != 6 {
+				return 0, fmt.Errorf("expected 6 words in quota line: %s", l)
+			}
+			quotaFound, err := strconv.Atoi(words[3])
+			if err != nil {
+				return 0, err
+			}
+			return quotaFound, nil
+		}
+	}
+	if quotaFound == 0 {
+		return 0, errors.New("no quota found in allocated time")
+	}
+
+	return quotaFound, nil
 }
 
 var _ = g.Describe("[volumes] Test local storage quota", func() {
@@ -169,12 +198,19 @@ var _ = g.Describe("[volumes] Test local storage quota", func() {
 			o.Expect(createPodErr).NotTo(o.HaveOccurred())
 			fmt.Println(output)
 
+			// We need to wait for the pod to be created:
+			g.By("wait for pod to be created")
+			time.Sleep(20 * time.Second)
+
 			// TODO: Check the filesystem xfs quota report for our fsgroup ID and appropriate quota set.
 			// xfs_quota -x -c 'report -n  -L 1000000000 -U 1000080000' volDir
 			g.By("verify XFS quota was applied")
 			quota, quotaErr := lookupXFSQuota(oc, fsGroup, volDir)
 			o.Expect(quotaErr).NotTo(o.HaveOccurred())
 			fmt.Printf("Got quota: %d\n", quota)
+
+			// We applied 256Mi, xfs_quota reports in Kb:
+			o.Expect(quota).To(o.Equal(262144))
 		})
 	})
 })
