@@ -77,6 +77,7 @@ fi
 
 # ensure proper relative directories are set
 export TMPDIR=${BASETMPDIR:-/tmp}
+# Keeps fixture location working properly:
 export EXTENDED_TEST_PATH="$(pwd)/test/extended"
 
 echo "[INFO] Running tests"

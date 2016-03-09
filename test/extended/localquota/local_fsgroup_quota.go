@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"regexp"
 	"strconv"
 	"strings"
 
@@ -26,20 +25,19 @@ func getEnvVar(key string) string {
 }
 
 func lookupFSGroup(oc *exutil.CLI, project string) (int, error) {
-	out, err := oc.Run("export").Args("project", project).Output()
+	//oc get project/default --template='{{ index .metadata.annotations "openshift.io/sa.scc.supplemental-groups" }}'
+	gidRange, err := oc.Run("get").Args("project", project, "--template='{{ index .metadata.annotations \"openshift.io/sa.scc.supplemental-groups\" }}'").Output()
 	fmt.Println(err)
 	if err != nil {
 		return 0, err
 	}
-	fmt.Println(out)
-	re := regexp.MustCompile("openshift\\.io\\/sa.scc.supplemental-groups: (\\d*)\\/(\\d*)")
-	result := re.FindAllStringSubmatch(out, -1)
-	if result == nil {
-		return 0, fmt.Errorf("unable to parse supplemental-groups from project yaml: %s", out)
-	}
+	fmt.Println(gidRange)
 
-	// Should be able to assume there is at least one
-	fsGroup, err := strconv.Atoi(result[0][1])
+	// gidRange will be something like: 1000030000/10000
+	fsGroupStr := strings.Split(gidRange, "/")[0]
+	fsGroupStr = strings.Replace(fsGroupStr, "'", "", -1)
+
+	fsGroup, err := strconv.Atoi(fsGroupStr)
 	if err != nil {
 		return 0, err
 	}
@@ -79,7 +77,7 @@ var _ = g.Describe("[volumes] Test local storage quota", func() {
 
 			volDir := getEnvVar(volumeDirVar)
 			o.Expect(volDir).NotTo(o.Equal(""))
-			// TODO: Verify volDir is on XFS?
+			// Verify volDir is on XFS, if not this test can't pass:
 			// Use pre-existing utility in the empty_dir quota.go.
 			fmt.Printf("volDir = %s\n", volDir)
 			args := []string{"-f", "-c", "'%T'", volDir}
@@ -87,9 +85,6 @@ var _ = g.Describe("[volumes] Test local storage quota", func() {
 			// If the volume directory is not on an XFS filesystem, this test cannot pass,
 			// so we'll fail it early.
 			o.Expect(strings.Contains(string(outBytes), "xfs")).To(o.BeTrue())
-
-			cwd, _ := os.Getwd()
-			fmt.Printf("\n\n  ################ Working in: %s\n\n", cwd)
 
 			// Lookup the fsgroup for the pod's project. (first group ID in the supplemental range)
 			fsGroup, err := lookupFSGroup(oc, project)
