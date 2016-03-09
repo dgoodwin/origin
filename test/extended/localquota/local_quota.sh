@@ -52,6 +52,7 @@ if [[ -z ${TEST_ONLY+x} ]]; then
   reset_tmp_dir
 
   os::log::start_system_logger
+  echo "[INFO] VOLUME_DIR=${VOLUME_DIR:-}"
 
   # when selinux is enforcing, the volume dir selinux label needs to be
   # svirt_sandbox_file_t
@@ -76,12 +77,11 @@ fi
 
 # ensure proper relative directories are set
 export TMPDIR=${BASETMPDIR:-/tmp}
+export EXTENDED_TEST_PATH="$(pwd)/test/extended"
 
-
-# run tests in serial
 echo "[INFO] Running tests"
 
-# TODO: Need a better way to omit all the k8s e2e tests that get picked up automatically:
+# Filter down to just run the local storage quota tests:
 ${ginkgo} -v  ${localquotatest} -- -ginkgo.v -test.timeout 2m -focus="local storage quota"
 #TEST_OUTPUT_QUIET=true ${localquotatest} --ginkgo.dryRun | sort
 

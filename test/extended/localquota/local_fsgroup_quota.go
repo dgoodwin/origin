@@ -3,6 +3,7 @@ package localquota
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"regexp"
 	"strconv"
 	"strings"
@@ -53,7 +54,8 @@ var _ = g.Describe("[volumes] Test local storage quota", func() {
 		projectName  = "local-quota"
 	)
 	var (
-		oc = exutil.NewCLI(projectName, exutil.KubeConfigPath())
+		oc                 = exutil.NewCLI(projectName, exutil.KubeConfigPath())
+		emptyDirPodFixture = exutil.FixturePath("..", "..", "examples", "hello-openshift", "hello-pod.json")
 	)
 
 	// TODO: Before we call this test, we need to modify node-config.yaml:
@@ -79,14 +81,27 @@ var _ = g.Describe("[volumes] Test local storage quota", func() {
 			o.Expect(volDir).NotTo(o.Equal(""))
 			// TODO: Verify volDir is on XFS?
 			// Use pre-existing utility in the empty_dir quota.go.
+			fmt.Printf("volDir = %s\n", volDir)
+			args := []string{"-f", "-c", "'%T'", volDir}
+			outBytes, _ := exec.Command("stat", args...).Output()
+			// If the volume directory is not on an XFS filesystem, this test cannot pass,
+			// so we'll fail it early.
+			o.Expect(strings.Contains(string(outBytes), "xfs")).To(o.BeTrue())
+
+			cwd, _ := os.Getwd()
+			fmt.Printf("\n\n  ################ Working in: %s\n\n", cwd)
 
 			// Lookup the fsgroup for the pod's project. (first group ID in the supplemental range)
 			fsGroup, err := lookupFSGroup(oc, project)
 			o.Expect(err).NotTo(o.HaveOccurred())
-			fmt.Printf("Found fsGroup for project: %s\n", fsGroup)
+			fmt.Printf("Found fsGroup for project: %d\n", fsGroup)
 
 			// TODO: Create a template that has an emptyDir volume, as simple as possible.
 			// Use hello-pod.json from examples?
+			g.By("creating simple pod with emptyDir volume")
+			output, createPodErr := oc.Run("create").Args("-f", emptyDirPodFixture).Output()
+			o.Expect(createPodErr).NotTo(o.HaveOccurred())
+			fmt.Println(output)
 
 			// TODO: Check the filesystem xfs quota report for our fsgroup ID and appropriate quota set.
 			// xfs_quota -x -c 'report -n  -L 1000000000 -U 1000080000' volDir

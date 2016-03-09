@@ -43,10 +43,6 @@ func NewQuotaApplicator(volumeDirectory string) (QuotaApplicator, error) {
 	return nil, fmt.Errorf("%s is not on a supported filesystem for local volume quota", volumeDirectory)
 }
 
-// IsQuotaSupported
-func IsQuotaSupported(volumeDirectory string) {
-}
-
 // quotaCommandRunner interface is used to abstract the actual running of
 // commands so we can unit test more behavior.
 type quotaCommandRunner interface {
