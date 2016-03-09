@@ -18,6 +18,14 @@ import (
 	exutil "github.com/openshift/origin/test/extended/util"
 )
 
+const (
+	volumeDirVar       = "VOLUME_DIR"
+	projectName        = "local-quota"
+	podName            = "hello-openshift"
+	podCreationTimeout = 30 // seconds
+	expectedQuotaKb    = 262144
+)
+
 func getEnvVar(key string) string {
 	for _, e := range os.Environ() {
 		pair := strings.Split(e, "=")
@@ -143,10 +151,6 @@ func lookupXFSQuota(oc *exutil.CLI, fsGroup int, volDir string) (int, error) {
 
 var _ = g.Describe("[volumes] Test local storage quota", func() {
 	defer g.GinkgoRecover()
-	const (
-		volumeDirVar = "VOLUME_DIR"
-		projectName  = "local-quota"
-	)
 	var (
 		oc                 = exutil.NewCLI(projectName, exutil.KubeConfigPath())
 		emptyDirPodFixture = exutil.FixturePath("..", "..", "examples", "hello-openshift", "hello-pod.json")
@@ -199,18 +203,29 @@ var _ = g.Describe("[volumes] Test local storage quota", func() {
 			fmt.Println(output)
 
 			// We need to wait for the pod to be created:
-			g.By("wait for pod to be created")
-			time.Sleep(20 * time.Second)
+			g.By("wait for XFS quota to be applied and verify")
 
-			// TODO: Check the filesystem xfs quota report for our fsgroup ID and appropriate quota set.
-			// xfs_quota -x -c 'report -n  -L 1000000000 -U 1000080000' volDir
-			g.By("verify XFS quota was applied")
-			quota, quotaErr := lookupXFSQuota(oc, fsGroup, volDir)
-			o.Expect(quotaErr).NotTo(o.HaveOccurred())
-			fmt.Printf("Got quota: %d\n", quota)
+			// The quota takes a few seconds to appear, keep trying to find the correct value
+			// until we timeout. This allows for the possiblity a quota already exists for the
+			// gid from a past run, used for development purposes as you cannot easily delete a
+			// quota once applied.
+			secondsWaited := 0
+			quota := 0
+			for secondsWaited < podCreationTimeout {
+				quotaFound, quotaErr := lookupXFSQuota(oc, fsGroup, volDir)
+				o.Expect(quotaErr).NotTo(o.HaveOccurred())
+				if quotaFound == expectedQuotaKb {
+					quota = quotaFound
+					break
+				}
+
+				time.Sleep(1 * time.Second)
+				secondsWaited = secondsWaited + 1
+			}
 
 			// We applied 256Mi, xfs_quota reports in Kb:
-			o.Expect(quota).To(o.Equal(262144))
+			fmt.Printf("Got quota: %d\n", quota)
+			o.Expect(quota).To(o.Equal(expectedQuotaKb))
 		})
 	})
 })
