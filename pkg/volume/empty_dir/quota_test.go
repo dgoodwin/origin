@@ -48,7 +48,7 @@ func TestParseFsDevice(t *testing.T) {
 	}
 	for name, test := range tests {
 		t.Logf("running TestParseFsDevice: %s", name)
-		device, err := parseFsDevice(test.dfOutput)
+		device, err := ParseFsDevice(test.dfOutput)
 		if test.expDevice != "" && test.expDevice != device {
 			t.Errorf("Unexpected filesystem device, expected: %s, got: %s", test.expDevice, device)
 		}

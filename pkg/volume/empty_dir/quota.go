@@ -155,11 +155,11 @@ func (xqa *xfsQuotaApplicator) getFsDevice(dir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("unable to find filesystem device for emptyDir volume %s: %s", dir, err)
 	}
-	fsDevice, parseErr := parseFsDevice(out)
+	fsDevice, parseErr := ParseFsDevice(out)
 	return fsDevice, parseErr
 }
 
-func parseFsDevice(dfOutput string) (string, error) {
+func ParseFsDevice(dfOutput string) (string, error) {
 	// Need to skip the df header line starting with "Filesystem", and grab the first
 	// word of the following line which will be our device path.
 	lines := strings.Split(dfOutput, "\n")

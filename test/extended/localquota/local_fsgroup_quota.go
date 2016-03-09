@@ -1,7 +1,9 @@
 package localquota
 
 import (
+	"bytes"
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strconv"
@@ -10,7 +12,7 @@ import (
 	g "github.com/onsi/ginkgo"
 	o "github.com/onsi/gomega"
 
-	//"github.com/openshift/origin/pkg/volume/empty_dir"
+	"github.com/openshift/origin/pkg/volume/empty_dir"
 	exutil "github.com/openshift/origin/test/extended/util"
 )
 
@@ -22,6 +24,32 @@ func getEnvVar(key string) string {
 		}
 	}
 	return ""
+}
+
+// setFSGroupMustRunAs flips the restricted SCC's FSGroup setting
+// to MustRunAs. May not be required for long as this will soon be
+// the default.
+func setFSGroupMustRunAs(oc *exutil.CLI) error {
+	// Write out to temp file so we can edit the SCC and update it:
+	tempFile, err := ioutil.TempFile("", "fsgroup-scc-edit")
+	//defer os.Remove(tempFile.Name())
+	fmt.Printf("Created temp file: %s\n", tempFile.Name())
+
+	outBytes, err := oc.AsAdmin().Run("export").Args("scc/restricted").Output()
+	scc := string(outBytes)
+	// replace the fsGroup:
+	scc = strings.Replace(scc, "fsGroup:\n  type: RunAsAny", "fsGroup:\n  type: MustRunAs", -1)
+	_, writeErr := tempFile.WriteString(string(scc))
+	if writeErr != nil {
+		return writeErr
+	}
+
+	outBytes, err = oc.AsAdmin().Run("replace").Args("-f", tempFile.Name()).Output()
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Replace output: %s\n", string(outBytes))
+	return nil
 }
 
 func lookupFSGroup(oc *exutil.CLI, project string) (int, error) {
@@ -43,6 +71,45 @@ func lookupFSGroup(oc *exutil.CLI, project string) (int, error) {
 	}
 
 	return fsGroup, nil
+}
+
+// Sample XFS quota report output:
+// $ xfs_quota -x -c 'report -n' /tmp/openshift
+// Group quota on /tmp/openshift (/dev/sdb2)
+//                               Blocks
+// Group ID         Used       Soft       Hard    Warn/Grace
+// ---------- --------------------------------------------------
+// #0              99004          0          0     00 [--------]
+// #1000          166916  268435456  268435456     00 [--------]
+
+// lookupXFSQuota runs an xfs_quota report and parses the output
+// looking for the given fsGroup ID's hard quota.
+func lookupXFSQuota(oc *exutil.CLI, fsGroup int, volDir string) (int, error) {
+
+	// First lookup the filesystem device the volumeDir resides on:
+	outBytes, err := exec.Command("df", "--output=source", volDir).Output()
+	if err != nil {
+		return 0, err
+	}
+	fsDevice, parseErr := empty_dir.ParseFsDevice(string(outBytes))
+	if parseErr != nil {
+		return 0, parseErr
+	}
+	fmt.Printf("Volume directory is on: %s\n", fsDevice)
+
+	args := []string{"xfs_quota", "-x", "-c", "report -n", fsDevice}
+	fmt.Printf("%s\n", args)
+	cmd := exec.Command("sudo", args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	outBytes, err = cmd.Output()
+	if err != nil {
+		return 0, err
+	}
+	fmt.Printf("stderr: %s\n", stderr.String())
+	quotaReport := string(outBytes)
+	fmt.Printf("Got XFS Quota report: \n%s\n", quotaReport)
+	return 0, nil
 }
 
 var _ = g.Describe("[volumes] Test local storage quota", func() {
@@ -74,7 +141,11 @@ var _ = g.Describe("[volumes] Test local storage quota", func() {
 
 			// TODO: Modify appropriate SCC (presumably restricted) to set FSGroup to "MustRunAs"
 			// This may not be necessary once this merges: https://github.com/openshift/origin/pull/7334
+			g.By("updated restricted SCC for fsGroup MustRunAs")
+			sccEditErr := setFSGroupMustRunAs(oc)
+			o.Expect(sccEditErr).NotTo(o.HaveOccurred())
 
+			g.By("make sure volume directory is on an XFS filesystem")
 			volDir := getEnvVar(volumeDirVar)
 			o.Expect(volDir).NotTo(o.Equal(""))
 			// Verify volDir is on XFS, if not this test can't pass:
@@ -93,13 +164,17 @@ var _ = g.Describe("[volumes] Test local storage quota", func() {
 
 			// TODO: Create a template that has an emptyDir volume, as simple as possible.
 			// Use hello-pod.json from examples?
-			g.By("creating simple pod with emptyDir volume")
+			g.By("create simple pod with emptyDir volume")
 			output, createPodErr := oc.Run("create").Args("-f", emptyDirPodFixture).Output()
 			o.Expect(createPodErr).NotTo(o.HaveOccurred())
 			fmt.Println(output)
 
 			// TODO: Check the filesystem xfs quota report for our fsgroup ID and appropriate quota set.
 			// xfs_quota -x -c 'report -n  -L 1000000000 -U 1000080000' volDir
+			g.By("verify XFS quota was applied")
+			quota, quotaErr := lookupXFSQuota(oc, fsGroup, volDir)
+			o.Expect(quotaErr).NotTo(o.HaveOccurred())
+			fmt.Printf("Got quota: %d\n", quota)
 		})
 	})
 })
