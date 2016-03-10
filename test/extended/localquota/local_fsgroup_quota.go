@@ -2,7 +2,6 @@ package localquota
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
@@ -143,7 +142,7 @@ func lookupXFSQuota(oc *exutil.CLI, fsGroup int, volDir string) (int, error) {
 		}
 	}
 	if quotaFound == 0 {
-		return 0, errors.New("no quota found in allocated time")
+		return 0, fmt.Errorf("no quota found for group ID: %d", fsGroup)
 	}
 
 	return quotaFound, nil

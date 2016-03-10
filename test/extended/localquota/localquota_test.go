@@ -6,7 +6,6 @@ import (
 	exutil "github.com/openshift/origin/test/extended/util"
 )
 
-// init initialize the extended testing suite.
 func init() {
 	exutil.InitTest()
 }

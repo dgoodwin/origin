@@ -1,8 +1,9 @@
 #!/bin/bash
 #
 # This script runs the local quota tests which require volume dir
-# to be on an XFS filesystem. This test will fail if /tmp/openshift
-# is not on XFS.
+# to be on an XFS filesystem. For this test to pass you will need
+# an /tmp/openshift/xfs-vol-dir on an XFS filesystem, mounted with
+# the gquota option.
 
 set -o errexit
 set -o nounset
@@ -32,61 +33,48 @@ localquotatest="$(os::build::find-binary localquota.test)"
 source "${OS_ROOT}/hack/lib/util/environment.sh"
 os::util::environment::setup_time_vars
 
-if [[ -z ${TEST_ONLY+x} ]]; then
-  ensure_iptables_or_die
+ensure_iptables_or_die
 
-  function cleanup()
-  {
-    out=$?
-    cleanup_openshift
-    echo "[INFO] Exiting"
-    return $out
-  }
+function cleanup()
+{
+  out=$?
+  cleanup_openshift
+  echo "[INFO] Exiting"
+  return $out
+}
 
-  trap "exit" INT TERM
-  trap "cleanup" EXIT
-  echo "[INFO] Starting server"
+trap "exit" INT TERM
+trap "cleanup" EXIT
+echo "[INFO] Starting server"
 
-  os::util::environment::setup_all_server_vars "test-extended/localquota"
-  os::util::environment::use_sudo
-  reset_tmp_dir
+os::util::environment::setup_all_server_vars "test-extended/localquota"
+os::util::environment::use_sudo
+reset_tmp_dir
 
-  os::log::start_system_logger
+os::log::start_system_logger
 
-  # Use a special mount point for the volume directory in this test. This test
-  # suite requires that volume directory be on an XFS filesystem, and mounted
-  # with gquota option. The test images will ensure this is the case.
-  #
-  # To run this test locally and have it pass, you will need to create an XFS
-  # filesystem device and mount it to /tmp/openshift/xfs-vol-dir with the
-  # gquota option.
-  export VOLUME_DIR="/tmp/openshift/xfs-vol-dir"
-  echo "[INFO] VOLUME_DIR=${VOLUME_DIR:-}"
+# Use a special mount point for the volume directory in this test. This test
+# suite requires that volume directory be on an XFS filesystem, and mounted
+# with gquota option. The test images will ensure this is the case.
+export VOLUME_DIR="/tmp/openshift/xfs-vol-dir"
+echo "[INFO] VOLUME_DIR=${VOLUME_DIR:-}"
 
-  # when selinux is enforcing, the volume dir selinux label needs to be
-  # svirt_sandbox_file_t
-  #
-  # TODO: fix the selinux policy to either allow openshift_var_lib_dir_t
-  # or to default the volume dir to svirt_sandbox_file_t.
-  if selinuxenabled; then
-         sudo chcon -t svirt_sandbox_file_t ${VOLUME_DIR}
-  fi
-  configure_os_server
-
-  # Enable a 256Mi local storage quota for emptyDir volumes:
-  sed -i 's/fsGroup: null/fsGroup: 256Mi/' $NODE_CONFIG_DIR/node-config.yaml
-
-  echo "[INFO] Node config"
-  cat $NODE_CONFIG_DIR/node-config.yaml
-
-  start_os_server
-
-  export KUBECONFIG="${ADMIN_KUBECONFIG}"
-
-else
-  # be sure to set VOLUME_DIR if you are running with TEST_ONLY
-  echo "[INFO] Not starting server, VOLUME_DIR=${VOLUME_DIR:-}"
+# when selinux is enforcing, the volume dir selinux label needs to be
+# svirt_sandbox_file_t
+#
+# TODO: fix the selinux policy to either allow openshift_var_lib_dir_t
+# or to default the volume dir to svirt_sandbox_file_t.
+if selinuxenabled; then
+       sudo chcon -t svirt_sandbox_file_t ${VOLUME_DIR}
 fi
+configure_os_server
+
+# Enable a 256Mi local storage quota for emptyDir volumes:
+sed -i 's/fsGroup: null/fsGroup: 256Mi/' $NODE_CONFIG_DIR/node-config.yaml
+
+start_os_server
+
+export KUBECONFIG="${ADMIN_KUBECONFIG}"
 
 # ensure proper relative directories are set
 export TMPDIR=${BASETMPDIR:-/tmp}
@@ -97,5 +85,4 @@ echo "[INFO] Running tests"
 
 # Filter down to just run the local storage quota tests:
 ${ginkgo} -v  ${localquotatest} -- -ginkgo.v -test.timeout 2m -focus="local storage quota"
-#TEST_OUTPUT_QUIET=true ${localquotatest} --ginkgo.dryRun | sort
 
