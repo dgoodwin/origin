@@ -55,6 +55,8 @@ func RunOperator(ctx context.Context, controllerCtx *controllercmd.ControllerCon
 	configInformer := configv1informer.NewClusterOperatorInformer(configClient, time.Minute, cache.Indexers{})
 	crdInformer := apiextensionsv1informer.NewCustomResourceDefinitionInformer(kubeClient, time.Minute, cache.Indexers{})
 
+	// TODO: what happens if we watch *everything*?
+
 	openshiftConfigObserver := configmonitor.NewConfigObserverController(
 		dynamicClient,
 		crdInformer,
@@ -66,9 +68,32 @@ func RunOperator(ctx context.Context, controllerCtx *controllercmd.ControllerCon
 				Version: "v1",
 			},
 		},
+		[]schema.GroupVersionKind{
+			{
+				Group:   "",
+				Version: "v1",
+				Kind:    "Pod",
+			},
+			{
+				Group:   "apps",
+				Version: "v1",
+				Kind:    "Deployment",
+			},
+			{
+				Group:   "apps",
+				Version: "v1",
+				Kind:    "DaemonSet",
+			},
+			{
+				Group:   "",
+				Version: "v1",
+				Kind:    "Event",
+			},
+		},
 		controllerCtx.EventRecorder,
 	)
 
+	// TODO: DO we need this metric tracking cluster operator status?
 	clusterOperatorMetric := clusteroperatormetric.NewClusterOperatorMetricController(configInformer, configClient.ConfigV1(), controllerCtx.EventRecorder)
 
 	go crdInformer.Run(ctx.Done())
