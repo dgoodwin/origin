@@ -60,7 +60,7 @@ func NewConfigObserverController(
 	return factory.New().WithInformers(c.crdInformer).ResyncEvery(defaultResyncDuration).WithSync(c.sync).ToController("ConfigObserverController", recorder.WithComponentSuffix("config-observer-controller"))
 }
 
-// currentResourceKinds returns list of group version kind for each resoure we want to watch currently.
+// currentResourceKinds returns list of group version kind for each resource we want to watch currently.
 // We may be watching for CRDs which do not initially exist, thus why this is "current" resource kinds.
 func (c *ConfigObserverController) currentResourceKinds() ([]schema.GroupVersionKind, error) {
 	observedCrds, err := c.crdLister.List(labels.Everything())
