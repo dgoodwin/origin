@@ -79,17 +79,17 @@ func RunOperator(ctx context.Context, controllerCtx *controllercmd.ControllerCon
 				Version: "v1",
 				Kind:    "DaemonSet",
 			},
-			/*
-				{
-					Group:   "",
-					Version: "v1",
-					Kind:    "Event",
-				},
-						{
-							Group:   "",
-							Version: "v1",
-							Kind:    "Pod",
-						},
+			/* TODO: bring these in when ready, a little chatty for development.
+			{
+				Group:   "",
+				Version: "v1",
+				Kind:    "Event",
+			},
+			{
+				Group:   "",
+				Version: "v1",
+				Kind:    "Pod",
+			},
 			*/
 		},
 		controllerCtx.EventRecorder,

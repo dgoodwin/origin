@@ -25,6 +25,7 @@ var (
 	defaultResyncDuration = 1 * time.Minute
 )
 
+// TODO: rename as this monitors core resource as well. Document how this works with CRDs as well.
 type ConfigObserverController struct {
 	crdLister        apiextensionsv1lister.CustomResourceDefinitionLister
 	crdInformer      cache.SharedIndexInformer
@@ -109,7 +110,8 @@ func (c *ConfigObserverController) sync(ctx context.Context, syncCtx factory.Syn
 		return err
 	}
 
-	// TODO: The CRD delete case is not handled
+	// TODO: The CRD delete case is not handled. This would require shutting down an observer on a GVK that
+	// no longer exists?
 	var (
 		currentList      []string
 		needObserverList []string
