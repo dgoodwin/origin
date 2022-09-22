@@ -1,6 +1,8 @@
 package cmd
 
 import (
+	"context"
+
 	"github.com/spf13/cobra"
 
 	"github.com/openshift/library-go/pkg/controller/controllercmd"
@@ -12,7 +14,7 @@ import (
 func NewRunResourceWatchCommand() *cobra.Command {
 	cmd := controllercmd.
 		NewControllerCommandConfig("run-resourcewatch", version.Get(), operator.RunOperator).
-		NewCommand()
+		NewCommandWithContext(context.TODO())
 	cmd.Use = "run-resourcewatch"
 	cmd.Short = "Run watch for resource changes and commit each to a git repository"
 	cmd.Long = `
