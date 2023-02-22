@@ -27,7 +27,7 @@ type AllowedAlertsFunc func(featureSet configv1.FeatureSet) (allowedFiringWithBu
 // Used by both upgrade and conformance suites, with different allowances for each.
 func CheckAlerts(allowancesFunc AllowedAlertsFunc,
 	restConfig *rest.Config,
-	prometheusClient prometheusv1.API, // TODO: remove
+	prometheusClient prometheusv1.API,   // TODO: remove
 	configClient configclient.Interface, // TODO: remove
 	testDuration time.Duration,
 	f *framework.Framework) {
@@ -48,30 +48,36 @@ func CheckAlerts(allowancesFunc AllowedAlertsFunc,
 	for _, alertTest := range allowedalerts.AllAlertTests(&platformidentification.JobType{},
 		allowedalerts.DefaultAllowances) {
 
-		switch alertTest.AlertState() {
-		case allowedalerts.AlertPending:
-			// a pending test covers pending and everything above (firing)
-			allowedPendingAlerts = append(allowedPendingAlerts,
-				helper.MetricCondition{
-					Selector: map[string]string{"alertname": alertTest.AlertName()},
-					Text:     "has a separate e2e test",
-				},
-			)
-			allowedFiringAlerts = append(allowedFiringAlerts,
-				helper.MetricCondition{
-					Selector: map[string]string{"alertname": alertTest.AlertName()},
-					Text:     "has a separate e2e test",
-				},
-			)
-		case allowedalerts.AlertInfo:
-			// an info test covers all firing
-			allowedFiringAlerts = append(allowedFiringAlerts,
-				helper.MetricCondition{
-					Selector: map[string]string{"alertname": alertTest.AlertName()},
-					Text:     "has a separate e2e test",
-				},
-			)
-		}
+		/*
+			switch alertTest.AlertState() {
+			case allowedalerts.AlertPending:
+				// a pending test covers pending and everything above (firing)
+				allowedPendingAlerts = append(allowedPendingAlerts,
+					helper.MetricCondition{
+						Selector: map[string]string{"alertname": alertTest.AlertName()},
+						Text:     "has a separate e2e test",
+					},
+				)
+
+		*/
+		allowedFiringAlerts = append(allowedFiringAlerts,
+			helper.MetricCondition{
+				Selector: map[string]string{"alertname": alertTest.AlertName()},
+				Text:     "has a separate e2e test",
+			},
+		)
+		/*
+			case allowedalerts.AlertInfo:
+				// an info test covers all firing
+				allowedFiringAlerts = append(allowedFiringAlerts,
+					helper.MetricCondition{
+						Selector: map[string]string{"alertname": alertTest.AlertName()},
+						Text:     "has a separate e2e test",
+					},
+				)
+			}
+
+		*/
 	}
 
 	knownViolations := sets.NewString()

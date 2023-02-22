@@ -12,6 +12,7 @@ import (
 
 type AlertStatisticalData struct {
 	AlertDataKey `json:",inline"`
+	AlertLevel   string
 	Name         string
 	P95          float64
 	P99          float64
@@ -21,7 +22,6 @@ type AlertStatisticalData struct {
 type AlertDataKey struct {
 	AlertName      string
 	AlertNamespace string
-	AlertLevel     string
 
 	platformidentification.JobType `json:",inline"`
 }
@@ -77,11 +77,11 @@ func NewAlertMatcherWithHistoricalData(data map[AlertDataKey]AlertStatisticalDat
 	}
 }
 
-func (b *AlertBestMatcher) bestMatch(key AlertDataKey) (AlertStatisticalData, string, error) {
+func (b *AlertBestMatcher) bestMatch(key AlertDataKey) (AlertStatisticalData, string) {
 	exactMatchKey := key
 
 	if percentiles, ok := b.HistoricalData[exactMatchKey]; ok && percentiles.JobRuns >= minJobRuns {
-		return percentiles, "", nil
+		return percentiles, ""
 	}
 
 	// tested in TestGetClosestP95Value in allowedbackendisruption.  Should get a local test at some point.
@@ -93,43 +93,38 @@ func (b *AlertBestMatcher) bestMatch(key AlertDataKey) (AlertStatisticalData, st
 		nextBestMatchKey := AlertDataKey{
 			AlertName:      key.AlertName,
 			AlertNamespace: key.AlertNamespace,
-			AlertLevel:     key.AlertLevel,
 			JobType:        nextBestJobType,
 		}
 		if percentiles, ok := b.HistoricalData[nextBestMatchKey]; ok && percentiles.JobRuns >= minJobRuns {
-			return percentiles, fmt.Sprintf("(no exact match for %#v, fell back to %#v)", exactMatchKey, nextBestMatchKey), nil
+			return percentiles, fmt.Sprintf("(no exact match for %#v, fell back to %#v)", exactMatchKey, nextBestMatchKey)
 		}
 	}
-
-	// TODO: ensure our core platforms are here, error if not. We need to be sure our aggregated jobs are running this
-	// but in a way that won't require manual code maintenance every release...
 
 	// We now only track disruption data for frequently run jobs where we have enough runs to make a reliable P95 or P99
 	// determination. If we did not record historical data for this NURP combination, we do not wish to enforce
 	// disruption testing on a per job basis. Return an empty data result to signal we have no data, and skip the test.
 	return AlertStatisticalData{},
-		fmt.Sprintf("(no exact or fuzzy match for jobType=%#v)", key.JobType),
-		nil
+		fmt.Sprintf("(no exact or fuzzy match for %#v)", key)
 }
 
 // BestMatchDuration returns the best possible match for this historical data.  It attempts an exact match first, then
 // it attempts to match on the most important keys in order, before giving up and returning an empty default,
 // which means to skip testing against this data.
-func (b *AlertBestMatcher) BestMatchDuration(key AlertDataKey) (StatisticalDuration, string, error) {
-	rawData, details, err := b.bestMatch(key)
+func (b *AlertBestMatcher) BestMatchDuration(key AlertDataKey) (StatisticalDuration, string) {
+	rawData, details := b.bestMatch(key)
 	// Empty data implies we have none, and thus do not want to run the test.
 	if rawData == (AlertStatisticalData{}) {
-		return StatisticalDuration{}, details, err
+		return StatisticalDuration{}, details
 	}
-	return toAlertStatisticalDuration(rawData), details, err
+	return toAlertStatisticalDuration(rawData), details
 }
 
-func (b *AlertBestMatcher) BestMatchP99(key AlertDataKey) (*time.Duration, string, error) {
-	rawData, details, err := b.BestMatchDuration(key)
+func (b *AlertBestMatcher) BestMatchP99(key AlertDataKey) (*time.Duration, string) {
+	rawData, details := b.BestMatchDuration(key)
 	if rawData == (StatisticalDuration{}) {
-		return nil, details, err
+		return nil, details
 	}
-	return &rawData.P99, details, err
+	return &rawData.P99, details
 }
 
 func toAlertStatisticalDuration(in AlertStatisticalData) StatisticalDuration {

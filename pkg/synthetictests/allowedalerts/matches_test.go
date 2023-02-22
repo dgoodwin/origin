@@ -25,7 +25,6 @@ func TestGetClosestP99Value(t *testing.T) {
 			AlertDataKey: historicaldata.AlertDataKey{
 				AlertName:      "etcdGRPCRequestsSlow",
 				AlertNamespace: "",
-				AlertLevel:     "warning",
 				JobType: platformidentification.JobType{
 					Release:      "4.12",
 					FromRelease:  "4.12",
@@ -43,7 +42,6 @@ func TestGetClosestP99Value(t *testing.T) {
 			AlertDataKey: historicaldata.AlertDataKey{
 				AlertName:      "etcdGRPCRequestsSlow",
 				AlertNamespace: "",
-				AlertLevel:     "warning",
 				JobType: platformidentification.JobType{
 					Release:      "4.12",
 					FromRelease:  "4.12",
@@ -61,7 +59,6 @@ func TestGetClosestP99Value(t *testing.T) {
 			AlertDataKey: historicaldata.AlertDataKey{
 				AlertName:      "etcdGRPCRequestsSlow",
 				AlertNamespace: "",
-				AlertLevel:     "warning",
 				JobType: platformidentification.JobType{
 					Release:      "4.13",
 					FromRelease:  "4.12",
@@ -94,7 +91,6 @@ func TestGetClosestP99Value(t *testing.T) {
 			key: historicaldata.AlertDataKey{
 				AlertName:      "etcdGRPCRequestsSlow",
 				AlertNamespace: "",
-				AlertLevel:     "warning",
 				JobType: platformidentification.JobType{
 					Release:      "4.12",
 					FromRelease:  "4.12",
@@ -111,7 +107,6 @@ func TestGetClosestP99Value(t *testing.T) {
 			key: historicaldata.AlertDataKey{
 				AlertName:      "etcdGRPCRequestsSlow",
 				AlertNamespace: "",
-				AlertLevel:     "warning",
 				JobType: platformidentification.JobType{
 					Release:      "4.12",
 					FromRelease:  "4.12",
@@ -128,7 +123,6 @@ func TestGetClosestP99Value(t *testing.T) {
 			key: historicaldata.AlertDataKey{
 				AlertName:      "notARealAlert",
 				AlertNamespace: "",
-				AlertLevel:     "warning",
 				JobType: platformidentification.JobType{
 					Release:      "4.10",
 					FromRelease:  "4.10",
@@ -144,7 +138,6 @@ func TestGetClosestP99Value(t *testing.T) {
 			key: historicaldata.AlertDataKey{
 				AlertName:      "etcdGRPCRequestsSlow",
 				AlertNamespace: "",
-				AlertLevel:     "warning",
 				JobType: platformidentification.JobType{
 					Release:      "4.13",
 					FromRelease:  "4.12",
@@ -160,8 +153,7 @@ func TestGetClosestP99Value(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			matcher := historicaldata.NewAlertMatcherWithHistoricalData(historicalDataMap)
-			actualDuration, _, actualErr := matcher.BestMatchP99(tt.key)
-			assert.Nil(t, actualErr)
+			actualDuration, _ := matcher.BestMatchP99(tt.key)
 			assert.EqualValues(t, tt.expectedDuration, actualDuration, "unexpected duration")
 		})
 	}
@@ -223,7 +215,6 @@ func TestAlertDataFileParsing(t *testing.T) {
 	expectedKey := historicaldata.AlertDataKey{
 		AlertName:      "AlertmanagerReceiversNotConfigured",
 		AlertNamespace: "openshift-monitoring",
-		AlertLevel:     "Warning",
 		JobType: platformidentification.JobType{
 			Release:      currentRelease,
 			FromRelease:  currentRelease,
@@ -233,9 +224,8 @@ func TestAlertDataFileParsing(t *testing.T) {
 			Topology:     "ha",
 		},
 	}
-	hd, msg, err := alertMatcher.BestMatchDuration(expectedKey)
+	hd, msg := alertMatcher.BestMatchDuration(expectedKey)
 	assert.True(t, hd.P99 > 5*time.Minute, "AlertmanagerReceiversNotConfigured data not present for aws amd64 ovn ha")
 	assert.Equal(t, "", msg)
-	assert.NoError(t, err)
 
 }

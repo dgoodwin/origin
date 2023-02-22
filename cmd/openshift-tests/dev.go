@@ -99,7 +99,7 @@ a running cluster.
 		"Platform for simulated cluster under test when intervals were gathered (aws, azure, gcp, metal, vsphere, etc)")
 	cmd.Flags().StringVar(
 		&opts.network,
-		"network", "ocp",
+		"network", "ovn",
 		"Network plugin for simulated cluster under test when intervals were gathered")
 	cmd.Flags().StringVar(
 		&opts.release,
@@ -195,7 +195,7 @@ a running cluster.
 		"Platform for simulated cluster under test when intervals were gathered (aws, azure, gcp, metal, vsphere, etc)")
 	cmd.Flags().StringVar(
 		&opts.network,
-		"network", "ocp",
+		"network", "ovn",
 		"Network plugin for simulated cluster under test when intervals were gathered")
 	cmd.Flags().StringVar(
 		&opts.release,

@@ -46,10 +46,6 @@ func (a *watchdogAlertTest) AlertName() string {
 	return "Watchdog"
 }
 
-func (a *watchdogAlertTest) AlertState() AlertState {
-	return AlertInfo
-}
-
 func (a *watchdogAlertTest) TestAlert(ctx context.Context, prometheusClient prometheusv1.API, restConfig *rest.Config) error {
 	testDuration := exutil.DurationSinceStartInSeconds().String()
 

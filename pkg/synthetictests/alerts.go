@@ -104,6 +104,7 @@ func runBackstopTest(
 	alertIntervals monitorapi.Intervals,
 	alertTests []allowedalerts.AlertTest) []*junitapi.JUnitTestCase {
 
+	// TODO: remove pending alert checks, we don't care right now.
 	firingAlertsWithBugs, allowedFiringAlerts, pendingAlertsWithBugs, allowedPendingAlerts :=
 		allowancesFunc(featureSet)
 
@@ -117,30 +118,36 @@ func runBackstopTest(
 	// everything else.
 	for _, alertTest := range alertTests {
 
-		switch alertTest.AlertState() {
-		case allowedalerts.AlertPending:
-			// a pending test covers pending and everything above (firing)
-			allowedPendingAlerts = append(allowedPendingAlerts,
-				helper.MetricCondition{
-					Selector: map[string]string{"alertname": alertTest.AlertName()},
-					Text:     "has a separate e2e test",
-				},
-			)
-			allowedFiringAlerts = append(allowedFiringAlerts,
-				helper.MetricCondition{
-					Selector: map[string]string{"alertname": alertTest.AlertName()},
-					Text:     "has a separate e2e test",
-				},
-			)
-		case allowedalerts.AlertInfo:
-			// an info test covers all firing
-			allowedFiringAlerts = append(allowedFiringAlerts,
-				helper.MetricCondition{
-					Selector: map[string]string{"alertname": alertTest.AlertName()},
-					Text:     "has a separate e2e test",
-				},
-			)
-		}
+		/*
+			switch alertTest.AlertState() {
+			case allowedalerts.AlertPending:
+				// a pending test covers pending and everything above (firing)
+				allowedPendingAlerts = append(allowedPendingAlerts,
+					helper.MetricCondition{
+						Selector: map[string]string{"alertname": alertTest.AlertName()},
+						Text:     "has a separate e2e test",
+					},
+				)
+
+		*/
+		allowedFiringAlerts = append(allowedFiringAlerts,
+			helper.MetricCondition{
+				Selector: map[string]string{"alertname": alertTest.AlertName()},
+				Text:     "has a separate e2e test",
+			},
+		)
+		/*
+			case allowedalerts.AlertInfo:
+				// an info test covers all firing
+				allowedFiringAlerts = append(allowedFiringAlerts,
+					helper.MetricCondition{
+						Selector: map[string]string{"alertname": alertTest.AlertName()},
+						Text:     "has a separate e2e test",
+					},
+				)
+			}
+
+		*/
 	}
 
 	knownViolations := sets.NewString()

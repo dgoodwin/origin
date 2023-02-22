@@ -29,23 +29,24 @@ func NewAllowedWhenEtcdRevisionChange(ctx context.Context, kubeClient kubernetes
 	}, nil
 }
 
-func (d *etcdRevisionChangeAllowance) FailAfter(key historicaldata.AlertDataKey) (time.Duration, error) {
+func (d *etcdRevisionChangeAllowance) FailAfter(key historicaldata.AlertDataKey) *time.Duration {
 	// if the number of revisions is different compared to what we have collected at the beginning of the test suite
 	// increase allowed time for the alert
 	// the rationale is that some tests might roll out a new version of etcd during each rollout we allow max 3 elections per revision (we assume there are 3 master machines at most)
 	// in the future, we could make this function more dynamic
 	// we will leave it simple for now
 	if d.numberOfRevisionDuringTest > 2 {
-		return time.Duration(d.numberOfRevisionDuringTest) * 15 * time.Minute, nil
+		dur := time.Duration(d.numberOfRevisionDuringTest) * 15 * time.Minute
+		return &dur
 
 	}
-	allowed, _, _ := getClosestPercentilesValues(key)
-	return allowed.P99, nil
+	allowed, _ := getClosestPercentilesValues(key)
+	return &allowed.P99
 }
 
-func (d *etcdRevisionChangeAllowance) FlakeAfter(key historicaldata.AlertDataKey) time.Duration {
-	allowed, _, _ := getClosestPercentilesValues(key)
-	return allowed.P95
+func (d *etcdRevisionChangeAllowance) FlakeAfter(key historicaldata.AlertDataKey) *time.Duration {
+	allowed, _ := getClosestPercentilesValues(key)
+	return &allowed.P95
 }
 
 // GetEstimatedNumberOfRevisionsForEtcdOperator calculates the number of revisions that have occurred between now and duration
