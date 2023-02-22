@@ -84,23 +84,8 @@ func (a *alertBuilder) withAllowance(allowanceCalculator AlertTestAllowanceCalcu
 	return a
 }
 
-func (a *alertBuilder) pending() *alertBuilder {
-	a.alertState = AlertPending
-	return a
-}
-
 func (a *alertBuilder) firing() *alertBuilder {
 	a.alertState = AlertInfo
-	return a
-}
-
-func (a *alertBuilder) warning() *alertBuilder {
-	a.alertState = AlertWarning
-	return a
-}
-
-func (a *alertBuilder) critical() *alertBuilder {
-	a.alertState = AlertCritical
 	return a
 }
 
