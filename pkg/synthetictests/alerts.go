@@ -132,8 +132,9 @@ func runBackstopTest(
 		*/
 		allowedFiringAlerts = append(allowedFiringAlerts,
 			helper.MetricCondition{
-				Selector: map[string]string{"alertname": alertTest.AlertName()},
-				Text:     "has a separate e2e test",
+				AlertName:      alertTest.AlertName(),
+				AlertNamespace: alertTest.AlertNamespace(),
+				Text:           "has a separate e2e test",
 			},
 		)
 		/*

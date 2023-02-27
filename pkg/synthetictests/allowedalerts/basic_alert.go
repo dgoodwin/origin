@@ -23,6 +23,9 @@ type AlertTest interface {
 	// AlertName is the name of the alert
 	AlertName() string
 
+	// AlertNamespace is the namespace of the alert
+	AlertNamespace() string
+
 	// InvariantCheck performs testing on this alert against the historical data committed to origin repo
 	// weekly, with some exceptions for cases we wish to silence.
 	InvariantCheck(intervals monitorapi.Intervals, r monitorapi.ResourcesMap) ([]*junitapi.JUnitTestCase, error)
@@ -110,6 +113,10 @@ func (a *basicAlertTest) InvariantTestName() string {
 
 func (a *basicAlertTest) AlertName() string {
 	return a.alertName
+}
+
+func (a *basicAlertTest) AlertNamespace() string {
+	return a.namespace
 }
 
 type testState int
